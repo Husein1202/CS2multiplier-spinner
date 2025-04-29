@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multiplier Spinner</title>
+  <style>
+    body {
+      background: #121212;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 30px;
+    }
+    #reel-container {
+      position: relative;
+      width: 720px;
+      height: 100px;
+      margin: 30px auto;
+      overflow: hidden;
+      border: 2px solid #333;
+      background: #1c1c1c;
+    }
+    #highlight-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: orange;
+      left: 50%;
+      transform: translateX(-1px);
+      z-index: 2;
+    }
+    #reel {
+      display: flex;
+      transform: translateX(0px);
+      transition: transform 0s ease-out;
+      will-change: transform;
+    }
+    .item {
+      flex: 0 0 100px;
+      height: 100px;
+      line-height: 100px;
+      font-size: 18px;
+      text-align: center;
+      border: 1px solid #444;
+      box-sizing: border-box;
+      border-radius: 5px;
+      background-color: #1eaa3b;
+    }
+    .item.loss {
+      background-color: #aa1e1e;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Multiplier Spinner Game</h1>
+  <p>Balance: <span id="balance">100.00</span> coins</p>
+
+  <input type="number" id="bet" value="10" min="1" step="1" />
+  <button onclick="startSpin()">Start Spin</button>
+
+  <div id="reel-container">
+    <div id="highlight-line"></div>
+    <div id="reel"></div>
+  </div>
+
+  <div id="result"></div>
+
+  <script>
+    const multipliers = [
+      0, 0.2, 0.5, 0.8, 0,
+      1, 1.2, 1.5, 1.8, 0,
+      2, 2.2, 2.5, 2.8, 0,
+      3, 3.2, 3.5, 3.8, 0,
+      4, 4.2, 4.5, 4.8, 0,
+      5, 5.2, 5.5, 5.8, 0,
+      10, 10.2, 10.5, 10.8, 0,
+      15, 15.2, 15.5, 15.8, 0,
+      30, 30.2, 30.5, 30.8, 0,
+      50, 50.2, 50.5, 50.8, 0,
+      100
+    ];
+
+    // Highly increased frequency of 0 to make loss more likely
+    const weightedMultipliers = [
+      ...Array(100).fill(0),  // 100 instances of 0 (loss) for high probability of loss
+      ...Array(10).fill(0.2),
+      ...Array(8).fill(0.5),
+      ...Array(6).fill(0.8),
+      ...Array(4).fill(1),
+      ...Array(3).fill(1.2),
+      ...Array(2).fill(1.5),
+      1.8, 2, 2.2, 2.5, 2.8,
+      3, 3.2, 3.5, 3.8,
+      4, 4.2, 4.5, 4.8,
+      5, 5.2, 5.5, 5.8,
+      10, 10.2,
+      10.5, 10.8,
+      15, 15.2,
+      15.5,
+      30,
+      50,
+      100
+    ];
+
+    const reelEl = document.getElementById("reel");
+    const balanceEl = document.getElementById("balance");
+    const resultEl = document.getElementById("result");
+
+    let spinning = false;
+    let balance = 100.00;
+    const itemWidth = 100;
+    const centerOffset = 360 - itemWidth / 2;
+
+    function fillReel() {
+      reelEl.innerHTML = "";
+      for (let i = 0; i < 5; i++) {
+        multipliers.forEach(mult => {
+          const div = document.createElement("div");
+          div.className = "item " + (mult === 0 ? "loss" : "prize");
+          div.textContent = `×${mult}`;
+          reelEl.appendChild(div);
+        });
+      }
+    }
+
+    function easeOutQuart(t) {
+      return 1 - Math.pow(1 - t, 4);
+    }
+
+    function startSpin() {
+      if (spinning) return;
+
+      const bet = parseFloat(document.getElementById("bet").value);
+      if (bet <= 0 || bet > balance) {
+        alert("Invalid bet amount.");
+        return;
+      }
+
+      balance -= bet;
+      balanceEl.textContent = balance.toFixed(2);
+      resultEl.textContent = "Spinning...";
+      fillReel();
+
+      const selected = weightedMultipliers[Math.floor(Math.random() * weightedMultipliers.length)];
+      const allItems = [...reelEl.children];
+      const selectedIndex = allItems.findIndex(el => el.textContent === `×${selected}`);
+      const targetOffset = selectedIndex * itemWidth - centerOffset;
+      const totalDistance = targetOffset + (itemWidth * multipliers.length * 3); // 3 full cycles
+
+      spinning = true;
+      const duration = 5000;
+      const startTime = performance.now();
+
+      function animate(time) {
+        const elapsed = time - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = easeOutQuart(progress);
+        const current = eased * totalDistance;
+
+        reelEl.style.transform = `translateX(-${current}px)`;
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          reelEl.style.transform = `translateX(-${targetOffset}px)`;
+          const winnings = selected * bet;
+          balance += winnings;
+          balanceEl.textContent = balance.toFixed(2);
+          resultEl.textContent = selected === 0
+            ? `You lost! Landed on ×0`
+            : `You won ${winnings.toFixed(2)} coins! Multiplier: ×${selected}`;
+          spinning = false;
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    fillReel();
+  </script>
+</body>
+</html>
